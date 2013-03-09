@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>SRTM Tile Grabber</title>
+<style>
+/*Layout*/
+  body {
+        padding-top: 20px;
+        padding-bottom: 40px;
+      }
+
+      /* Custom container */
+      .main {
+        margin: 0 auto;
+        width: 940px;
+      }
+      .main > hr {
+        margin: 20px 0;
+      }
+
+      .intro,
+      .outro {
+        margin: 30px 0;
+      }
+
+      #mirror_list {
+        margin-left: 10px;
+      }
+/*Bootstrap Customizations*/
+#tip {
+  display:none;
+  opacity:1;
+  width:200px;
+}
+#tip.active {
+  display: block;
+}
+#tip.tooltip .tooltip-inner {
+  padding: 18px 8px;
+  color: #222;
+  background-color: #fff;
+  -webkit-box-shadow: 0px 0px 15px #666;
+  -moz-box-shadow: 0px 0px 15px #666;
+  box-shadow: 0px 0px 15px #666;
+}
+#tip.tooltip .tooltip-arrow {
+  bottom: 0;
+  left: 50%;
+  margin-left: -5px;
+  border-top-color: #fff;
+  border-width: 5px 5px 0;
+}
+
+/*SVG*/
+.bg {
+  fill: white;
+  fill-opacity: 0;
+}
+.land {
+  fill: rgb(0,0,0);
+  stroke-opacity: 1;
+  opacity: .1;
+}
+
+.countries path {
+  stroke: rgb(80, 64, 39);  
+  stroke-linejoin: round;
+  stroke-width:1;
+  fill: #575757;
+  fill-opacity:.2;
+  stroke-opacity:.1;
+}
+
+.tile {
+  stroke: white;  
+  stroke-linejoin: round;
+  stroke-width:.5;
+  fill: rgb(200,50,50);
+  fill-opacity:.1;
+  stroke-opacity:.5;
+}
+  .tile:hover {
+    fill-opacity:.2;
+    stroke-opacity:1;
+    stroke-width:1.5;
+  }
+  .tile.selected { fill-opacity:.8; }
+  .tile.selected.downloaded,
+  .tile.downloaded {
+    fill: rgb(50,200,50);
+    fill-opacity:.5;
+  }
+    .tile.downloaded:hover { fill-opacity:.5; }
+
+.noclicks {  pointer-events:none; }
+
+.place_labels { 
+  font: 8px sans-serif; 
+  fill: black; 
+  opacity: .5; 
+  display: none; 
+}
+
+.place_points { 
+  opacity:.3; 
+  display:none; 
+}
+</style>
+<link href="css/bootstrap.css" rel="stylesheet" media="screen">
+
+<body>
+      <div class="main">
+
+      <div class="masthead">
+        <h3 class="">SRTM Tile Grabber</h3>
+      </div>
+      <hr>
+      <div class="intro">
+        <p class="lead">This interface attempts to ease the pain of downloading <strong>elevation data</strong> from the <a href="http://www2.jpl.nasa.gov/srtm/">Shuttle Radar Topography Mission</a>. Click on red tiles to download their corresponding data.
+      </div>
+      <hr>
+      <div class="svg_container">
+
+      <div id="tip" class="tooltip top">
+        <div class="tooltip-arrow"></div>
+        <div class="tooltip-inner">
+          You clicked tile <strong>' + file + '</strong>!<br>
+          <a id="tip_button" class="btn btn-small btn-success tip_button" href="" target="_blank">Download GeoTIFF</a><br>
+        </div>
+      </div>
+      </div>
+      <hr>
+      <div>
+          Change download mirror: 
+          <div id="mirror_list" class="btn-group" data-toggle="buttons-radio">
+            <button class="btn btn-small active" type="button" name="mirror" value="http://gis-lab.info/data/srtm-tif/">
+              GIS-LAB
+            </button>
+            <button class="btn btn-small" type="button" name="mirror" value="http://srtm.geog.kcl.ac.uk/portal/srtm41/srtm_data_geotiff/">
+              KCL HTTP
+            </button>
+            <button class="btn btn-small" type="button" name="mirror" value="http://srtm.csi.cgiar.org/SRT-ZIP/SRTM_V41/SRTM_Data_GeoTiff/">
+             CIAT-CSI HTTP
+            </button>
+            <button class="btn btn-small" type="button" name="mirror" value="ftp://srtm.csi.cgiar.org/SRTM_v41/SRTM_Data_GeoTIFF/">
+              CIAT-CSI FTP
+            </button>
+          </div>
+          <div class="btn btn-small pull-right citytoggle">Toggle cities</div>
+        </div>
+      <hr>
+      <div class="outro">
+        <p>Each tile comes in GeoTIFF format at 90-meter resolution (6000x6000 pixels), from various mirrors I've found on the web. Try <a href="http://developmentseed.org/blog/2009/jul/30/using-open-source-tools-make-elevation-maps-afghanistan-and-pakistan/">Development Seed</a> or <a href="http://linfiniti.com/2010/12/a-workflow-for-creating-beautiful-relief-shaded-dems-using-gdal/">Linfiniti</a> or <a href="http://github.com/dwtkns/gdal-cheat-sheet">this cheat sheet</a> for some help on doing nice things with this data using <a href="http://www.gdal.org/">GDAL</a>. 
+        <p> The files linked here are version 4.1 of an effort by the folks at <a href="http://srtm.csi.cgiar.org/">CIAT-CSI</a> to scrub, polish, and remove gaps in the raw SRTM data released by NASA. The SRTM grid originally comes from <a href="http://www.ambiotek.com/srtm">this KMZ file</a> for browsing the same data in Google Earth.
+        <p>Any download policies of the respective mirrors apply.
+      </div>
+      <hr>
+      <div class="footer"></div>
+        <small class="pull-right"> By <a href="http://twitter.com/dwtkns">@dwtkns</a>. Built with <a href="http://d3js.org/">D3js</a>. Questions or comments to dwtkns at gmail.</small>
+      </div>
+<script src="js/jquery-latest.js"></script>
+<script src="js/d3.v3.min.js"></script>
+<script src="js/queue.v1.min.js"></script>
+<script src="js/topojson.v0.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script>
+
+var globe = {
+  v: {
+    width: 940, 
+    height: 870,
+    scale: 425,
+    rotate: [0,-20],
+    labels_showing: 0,
+    file: null
+  },
+  params: {
+    proj: d3.geo.orthographic(), 
+    path: d3.geo.path(), 
+    drag: d3.behavior.drag()
+  },
+  el: {
+    svg: null,
+    bg: null, 
+    gradients: {
+      defs: { },
+      ocean: null, highlight: null, shading: null
+    },
+    countries: null, 
+    tiles: null,
+    cities: { points: null, labels: null }
+  },
+  init: function() {
+    globe.params.proj.scale(globe.v.scale)
+                     .rotate(globe.v.rotate)
+                     .translate([globe.v.width / 2, globe.v.height / 2])
+                     .clipAngle(90);
+    
+    globe.params.path.projection(globe.params.proj)
+                     .pointRadius(1.5);
+
+    globe.build();
+    globe.style_gradients();
+
+    queue()
+      .defer(d3.json, 'data/world.json')
+      .defer(d3.json, 'data/places.json')
+      .await(globe.ready);
+  },
+  build: function() {
+    // create SVG structure in correct order
+    globe.el.svg = d3.select('.svg_container').append('svg')
+      .attr('width',  globe.v.width)
+      .attr('height', globe.v.height)
+
+    var svg = globe.el.svg;
+
+    globe.el.gradients.defs = {
+      ocean:     svg.append('defs').append('radialGradient').attr('id', 'ocean'),
+      highlight: svg.append('defs').append('radialGradient').attr('id', 'highlight'),
+      shading:   svg.append('defs').append('radialGradient').attr('id', 'shading')
+    }
+
+    // background to allow clicking 'off' tiles
+    globe.el.bg                  = svg.append('rect')  .attr('class', 'bg').attr('height','100%').attr('width','100%')
+    globe.el.gradients.ocean     = svg.append('circle').attr('class', 'gradient noclicks');
+    globe.el.countries           = svg.append('g')     .attr('class', 'countries noclicks');
+    globe.el.tiles               = svg.append('g')     .attr('class', 'tiles');
+    globe.el.gradients.highlight = svg.append('circle').attr('class', 'gradient noclicks');
+    globe.el.gradients.shading   = svg.append('circle').attr('class', 'gradient noclicks')
+
+    globe.el.cities.points = svg.append('g').attr('class','place_points noclicks');
+    globe.el.cities.labels = svg.append('g').attr('class','place_labels noclicks');
+  },
+  style_gradients: function() {
+    var defs = globe.el.gradients.defs;
+
+    // define gradient parameters
+    defs.ocean    .attr('cx', '75%').attr('cy', '25%');
+    defs.highlight.attr('cx', '75%').attr('cy', '25%');
+    defs.shading  .attr('cx', '50%').attr('cy', '40%');
+
+    // globe.tools.new_gradient_stop(gradient def, location, color, opacity)
+    globe.tools.new_gradient_stop( defs.ocean,     '5%',   '#ebebef', '0.5' );
+    globe.tools.new_gradient_stop( defs.ocean,     '100%', '#a2abb3', '0.5' );
+
+    globe.tools.new_gradient_stop( defs.highlight, '5%',   '#ffffdd', '0.3' );
+    globe.tools.new_gradient_stop( defs.highlight, '100%', '#bbaa99', '0.1' );
+
+    globe.tools.new_gradient_stop( defs.shading,   '50%',  '#a2abb3', '0.0' );
+    globe.tools.new_gradient_stop( defs.shading,   '100%', '#57616b', '0.3' );
+
+    // apply those parameters through svg elements
+    globe.el.gradients.ocean
+        .attr('cx', globe.v.width  / 2)
+        .attr('cy', globe.v.height / 2)
+        .attr('r',  globe.params.proj.scale())
+        .style('fill', 'url(#ocean)');
+
+    globe.el.gradients.highlight
+        .attr('cx', globe.v.width  / 2)
+        .attr('cy', globe.v.height / 2)
+        .attr('r',  globe.params.proj.scale())
+        .style('fill', 'url(#highlight)');
+
+    globe.el.gradients.shading
+        .attr('cx', globe.v.width  / 2)
+        .attr('cy', globe.v.height / 2)
+        .attr('r',  globe.params.proj.scale())
+        .style('fill', 'url(#shading)');
+  },
+  ready: function(error, world, places) {
+    globe.el.countries.selectAll('path')
+      .data(topojson.object(world, world.objects.countries).geometries)
+    .enter().append('path')
+      .attr('class','country')
+      .attr('d', globe.params.path);
+
+    globe.el.tiles.selectAll('path')
+      .data(topojson.object(world, world.objects.srtm).geometries)
+    .enter().append('path')
+      .attr('class','tile')
+      .attr('d', globe.params.path)
+    
+    globe.el.cities.points.selectAll('text')
+      .data(places.features)
+     .enter().append('path')
+      .attr('class', 'place_point')
+      .attr('d', globe.params.path);
+
+    globe.el.cities.labels.selectAll('text')
+      .data(places.features)
+     .enter().append('text')
+      .attr('class', 'place_label')
+      .text(function(d) { return d.properties.name });
+
+    globe.interaction.listen();
+  },
+  interaction: {
+    listen: function() {
+      globe.el.svg.call(globe.params.drag);
+      globe.params.drag.on('drag', globe.interaction.drag);
+
+      globe.el.bg
+        .on('click',function() {
+          d3.select('#tip')
+            .classed('active',false)
+            .style('display', '');
+          d3.selectAll('.tile')
+            .classed('selected',false);
+        })
+
+      globe.el.tiles.selectAll('.tile')
+        .on('click',function(d){
+          d3.selectAll('.tile').classed('selected',false);
+          d3.select(this).classed('selected',true);
+          d3.select('#tip').classed('active',true)
+          globe.tip.make(d);
+        });
+
+      $('.citytoggle').on('click', globe.cities.toggle);
+      $('#mirror_list button').on('click', function() {
+          globe.tip.url($(this).val());
+      })
+      $('.tip_button').on('click', function() {
+          d3.select('.tile.selected')
+            .classed('downloaded',true);
+
+          d3.select('#tip')
+            .classed('active',false)
+            .style('display', '');
+      })
+    },
+    drag: function() {
+      var start = { 
+            lon: globe.params.proj.rotate()[0], 
+            lat: globe.params.proj.rotate()[1]
+          },
+          Δ = { 
+            x: d3.event.dx,
+            y: d3.event.dy  
+          },      
+          scaling = 0.15,
+          end = { 
+            lon: start.lon + Δ.x * scaling, 
+            lat: start.lat - Δ.y * scaling 
+          };
+
+      end.lat = end.lat >  30 ?  30 :
+                end.lat < -30 ? -30 :
+                end.lat;
+      
+      globe.params.proj.rotate([end.lon,end.lat])
+      globe.refresh();
+    }
+  },
+  tip: {
+    make: function(d) {
+      var mirror = $('#mirror_list button.active').val(),
+          offset = $('svg').offset(),
+          centroid = globe.params.path.centroid(d), 
+          loc = globe.params.proj.invert(centroid);
+
+      globe.v.file = d.properties.filename + '.zip';
+
+      $('#tip strong').text(globe.v.file)
+
+      d3.select('#tip').data([loc])
+
+      globe.tip.url(mirror);
+      globe.tip.move();
+    },
+    move: function() {
+      d3.select('#tip').each(function(d) {
+        if (!d) return
+        
+        var loc = globe.params.proj(d),
+            viewport = { 
+              h: $(window).height(), 
+              w: $(window).width() 
+            },
+            offset = $('svg').offset();
+        
+        var _bottom  = viewport.h - offset.top - loc[1] + 10 + 'px',
+            _left    = offset.left + loc[0]-105 + 'px',
+            _opacity = globe.tools.fade_at_edge(d),
+            _display = _opacity <= 0 ? 'none' : 'inline';
+
+        d3.select(this).style({
+          bottom:  _bottom,
+          left:    _left,
+          opacity: _opacity,
+          display: _display
+        });
+      });
+    },
+    url: function(mirror) {
+      var url = mirror + globe.v.file
+      $('#tip a').attr('href',url)
+    }
+  },
+  cities: {
+    move: function() {
+      globe.el.svg.selectAll('.place_label').each(function(d) {
+        var p = globe.params.proj(d.geometry.coordinates),
+            x = p[0],
+            y = p[1],
+            offset = d3.scale.linear().domain([0,globe.v.width]).range([-10,10]),
+            label  = d3.select(this);
+
+        var _x           = x+offset(x),
+            _y           = y-3,
+            _fillopacity = globe.tools.fade_at_edge(d.geometry.coordinates),
+            _display     = _fillopacity <= 0 ? 'none' : 'inline',
+            _textanchor  = x < globe.v.width/2-20 ? 'end' :
+                           x < globe.v.width/2+20 ? 'middle' :
+                                                    'start';
+        label.attr({ 
+          'x': _x, 
+          'y': _y,
+          'fill-opacity': _fillopacity,
+          'display': _display,
+          'text-anchor': _textanchor
+        });
+      });
+    },
+    toggle: function() {
+      if (globe.v.labels_showing) { 
+        globe.el.svg.select('.place_labels').style('display','none');
+        globe.el.svg.select('.place_points').style('display','none');
+        globe.v.labels_showing = 0;
+      }
+      else {
+        globe.el.svg.select('.place_labels').style('display','inline');
+        globe.el.svg.select('.place_points').style('display','inline');
+        globe.v.labels_showing = 1;
+        globe.refresh();
+      }
+    }
+  },
+  tools: {
+    new_gradient_stop: function(gradient, offset, color, opacity) {
+      gradient.append('stop').attr('offset', offset).attr('stop-color', color).attr('stop-opacity',opacity);
+    },
+    fade_at_edge: function(d) {
+      var fade = d3.scale.linear().domain([-.05,.15]).range([0,1]),
+          dist = 1.57 - globe.tools.distance_from_center(d);
+      return fade(dist)
+    },
+    distance_from_center: function(d) {
+      var centerPos = globe.params.proj.invert([globe.v.width/2,globe.v.height/2]),
+          arc = d3.geo.greatArc();
+      return arc.distance({source: d, target: centerPos})
+    }
+  },
+  refresh: function() {
+    globe.el.svg.selectAll('.country').attr('d', globe.params.path);
+    globe.el.svg.selectAll('.tile')   .attr('d', globe.params.path);
+
+    if (globe.v.labels_showing) {
+      globe.el.svg.selectAll('.place_point').attr('d', globe.params.path);
+      globe.cities.move();
+    }
+
+    if (d3.select('#tip').classed('active')) globe.tip.move();
+  }
+}
+
+globe.init();
+
+</script>
+</body>
+</html>
