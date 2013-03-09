@@ -118,8 +118,10 @@
         <p class="lead">This interface attempts to ease the pain of downloading <strong>elevation data</strong> from the <a href="http://www2.jpl.nasa.gov/srtm/">Shuttle Radar Topography Mission</a>. Click on red tiles to download their corresponding data.
       </div>
       <hr>
+      <!-- SVG spawned into this div -->
       <div class="svg_container">
 
+      <!-- This div holds the tooltip structure-->
       <div id="tip" class="tooltip top">
         <div class="tooltip-arrow"></div>
         <div class="tooltip-inner">
@@ -127,6 +129,7 @@
           <a id="tip_button" class="btn btn-small btn-success tip_button" href="" target="_blank">Download GeoTIFF</a><br>
         </div>
       </div>
+
       </div>
       <hr>
       <div>
@@ -165,6 +168,7 @@
 <script>
 
 var globe = {
+  // basic variables for the globe
   v: {
     width: 940, 
     height: 870,
@@ -173,11 +177,13 @@ var globe = {
     labels_showing: 0,
     file: null
   },
+  // d3 geo parameters and behaviors
   params: {
     proj: d3.geo.orthographic(), 
     path: d3.geo.path(), 
     drag: d3.behavior.drag()
   },
+  // svg elements
   el: {
     svg: null,
     bg: null, 
@@ -189,57 +195,70 @@ var globe = {
     tiles: null,
     cities: { points: null, labels: null }
   },
+  // globe initialization
   init: function() {
+    // set orthographic projection parameters
     globe.params.proj.scale(globe.v.scale)
                      .rotate(globe.v.rotate)
                      .translate([globe.v.width / 2, globe.v.height / 2])
                      .clipAngle(90);
     
+    // set path generator parameters
     globe.params.path.projection(globe.params.proj)
                      .pointRadius(1.5);
 
+    // build SVG 'skeleton', with different elements in proper order
     globe.build();
+    // style SVG shading and highlight gradients
     globe.style_gradients();
 
+    // load countries, tiles, and cities TopoJSON data; call globe.ready when finished
     queue()
       .defer(d3.json, 'data/world.json')
       .defer(d3.json, 'data/places.json')
       .await(globe.ready);
   },
   build: function() {
-    // create SVG structure in correct order
+    // create SVG element structure in correct order
+
     globe.el.svg = d3.select('.svg_container').append('svg')
       .attr('width',  globe.v.width)
       .attr('height', globe.v.height)
-
     var svg = globe.el.svg;
 
+    // add gradient definitions
     globe.el.gradients.defs = {
       ocean:     svg.append('defs').append('radialGradient').attr('id', 'ocean'),
       highlight: svg.append('defs').append('radialGradient').attr('id', 'highlight'),
       shading:   svg.append('defs').append('radialGradient').attr('id', 'shading')
     }
 
-    // background to allow clicking 'off' tiles
+    // background rectangle allows clicking 'off' tiles
     globe.el.bg                  = svg.append('rect')  .attr('class', 'bg').attr('height','100%').attr('width','100%')
+    // underlying ocean gradient
     globe.el.gradients.ocean     = svg.append('circle').attr('class', 'gradient noclicks');
+    // country and tile polygon groups
     globe.el.countries           = svg.append('g')     .attr('class', 'countries noclicks');
     globe.el.tiles               = svg.append('g')     .attr('class', 'tiles');
+    // globe highlight and shading gradients
     globe.el.gradients.highlight = svg.append('circle').attr('class', 'gradient noclicks');
     globe.el.gradients.shading   = svg.append('circle').attr('class', 'gradient noclicks')
-
+    // groups for city points and labels
     globe.el.cities.points = svg.append('g').attr('class','place_points noclicks');
     globe.el.cities.labels = svg.append('g').attr('class','place_labels noclicks');
   },
   style_gradients: function() {
+    // adds style information to gradient definitions, and connects those definitions to the correct SVG elements
+
     var defs = globe.el.gradients.defs;
 
-    // define gradient parameters
+    // gradient offsets
     defs.ocean    .attr('cx', '75%').attr('cy', '25%');
     defs.highlight.attr('cx', '75%').attr('cy', '25%');
     defs.shading  .attr('cx', '50%').attr('cy', '40%');
 
-    // globe.tools.new_gradient_stop(gradient def, location, color, opacity)
+    // define colors and opacities of gradients
+    // using globe.tools.new_gradient_stop(gradient def, location, color, opacity)
     globe.tools.new_gradient_stop( defs.ocean,     '5%',   '#ebebef', '0.5' );
     globe.tools.new_gradient_stop( defs.ocean,     '100%', '#a2abb3', '0.5' );
 
@@ -249,7 +268,7 @@ var globe = {
     globe.tools.new_gradient_stop( defs.shading,   '50%',  '#a2abb3', '0.0' );
     globe.tools.new_gradient_stop( defs.shading,   '100%', '#57616b', '0.3' );
 
-    // apply those parameters through svg elements
+    // apply gradient parameters to svg elements
     globe.el.gradients.ocean
         .attr('cx', globe.v.width  / 2)
         .attr('cy', globe.v.height / 2)
@@ -269,37 +288,47 @@ var globe = {
         .style('fill', 'url(#shading)');
   },
   ready: function(error, world, places) {
+    // called once TopoJSON data loaded
+
+    // create country polygons using the globe.params.path generator
     globe.el.countries.selectAll('path')
       .data(topojson.object(world, world.objects.countries).geometries)
     .enter().append('path')
       .attr('class','country')
       .attr('d', globe.params.path);
 
+    // create tile polygons
     globe.el.tiles.selectAll('path')
       .data(topojson.object(world, world.objects.srtm).geometries)
     .enter().append('path')
       .attr('class','tile')
       .attr('d', globe.params.path)
     
+    // create city points
     globe.el.cities.points.selectAll('text')
       .data(places.features)
      .enter().append('path')
       .attr('class', 'place_point')
       .attr('d', globe.params.path);
 
+    // add point labels
     globe.el.cities.labels.selectAll('text')
       .data(places.features)
      .enter().append('text')
       .attr('class', 'place_label')
       .text(function(d) { return d.properties.name });
 
+    // start listening for clicks and drags
     globe.interaction.listen();
   },
   interaction: {
     listen: function() {
+      // listen for mouse drags on svg
       globe.el.svg.call(globe.params.drag);
       globe.params.drag.on('drag', globe.interaction.drag);
 
+      // hide tooltip if a click is registered anywhere except a tile
+      //  (all other elements are unclickable because of '.noclicks' class)
       globe.el.bg
         .on('click',function() {
           d3.select('#tip')
@@ -309,6 +338,7 @@ var globe = {
             .classed('selected',false);
         })
 
+      // spawn a tooltip when a tile is clicked
       globe.el.tiles.selectAll('.tile')
         .on('click',function(d){
           d3.selectAll('.tile').classed('selected',false);
@@ -317,10 +347,15 @@ var globe = {
           globe.tip.make(d);
         });
 
+      // toggle city visibility when city toggle button is clicked
       $('.citytoggle').on('click', globe.cities.toggle);
+
+      // change tooltip URL when a new mirror is chosen
       $('#mirror_list button').on('click', function() {
           globe.tip.url($(this).val());
       })
+
+      // turn the selected tile green and hide tooltip when the download button is clicked
       $('.tip_button').on('click', function() {
           d3.select('.tile.selected')
             .classed('downloaded',true);
@@ -331,57 +366,82 @@ var globe = {
       })
     },
     drag: function() {
+      // rotate globe on drag
+
+          // initial globe rotation
       var start = { 
             lon: globe.params.proj.rotate()[0], 
             lat: globe.params.proj.rotate()[1]
           },
+          // mouse movement in x and y
           Δ = { 
             x: d3.event.dx,
             y: d3.event.dy  
-          },      
+          },
+          // scaling for how mouse drags translate to globe movement      
           scaling = 0.15,
+          // final globe rotation: start rotation plus scaled mouse movement
           end = { 
             lon: start.lon + Δ.x * scaling, 
             lat: start.lat - Δ.y * scaling 
           };
 
+      // clamp latitudinal rotation to 30 degrees N or S
       end.lat = end.lat >  30 ?  30 :
                 end.lat < -30 ? -30 :
                 end.lat;
       
+      // change the projection settings to new rotation
       globe.params.proj.rotate([end.lon,end.lat])
+      // refresh SVG paths
       globe.refresh();
     }
   },
   tip: {
     make: function(d) {
+      // change tooltip
+
+          // mirror url taken from currently active button in mirror list
       var mirror = $('#mirror_list button.active').val(),
+          // use jquery to get svg offset relative to scroll position
           offset = $('svg').offset(),
+          // centroid location of the clicked tile: [x,y]
           centroid = globe.params.path.centroid(d), 
+          // [lon,lat] location of the centroid
           loc = globe.params.proj.invert(centroid);
 
+      // build current filename from data attached to tiles JSON
       globe.v.file = d.properties.filename + '.zip';
 
+      // change tooltip file text
       $('#tip strong').text(globe.v.file)
 
+      // use d3 to attach location data to tooltip
       d3.select('#tip').data([loc])
 
+      // change tip url to the selected mirror
       globe.tip.url(mirror);
+      // update tip position
       globe.tip.move();
     },
     move: function() {
       d3.select('#tip').each(function(d) {
         if (!d) return
-        
+            // get location of tooltip attachment point in screen coordinates: [x,y]
         var loc = globe.params.proj(d),
+            // current window dimensions
             viewport = { 
               h: $(window).height(), 
               w: $(window).width() 
             },
+            // use jquery to get svg offset position
             offset = $('svg').offset();
         
+            // set tooltip location through absolute positioning using viewport size,
+            // known svg location within that viewport, and screen coords of active tile
         var _bottom  = viewport.h - offset.top - loc[1] + 10 + 'px',
             _left    = offset.left + loc[0]-105 + 'px',
+            // fade_at_edge() returns an opacity value for a given [lon,lat] based on distance from the edge of the globe
             _opacity = globe.tools.fade_at_edge(d),
             _display = _opacity <= 0 ? 'none' : 'inline';
 
@@ -400,17 +460,23 @@ var globe = {
   },
   cities: {
     move: function() {
+      // update locations of city labels
       globe.el.svg.selectAll('.place_label').each(function(d) {
         var p = globe.params.proj(d.geometry.coordinates),
             x = p[0],
             y = p[1],
+            // label offset ranges from -10 to 10 depending on the current horizontal location of each city
+            // eg, labels of cities to the far left of the globe are offset 10 pixels to the left
             offset = d3.scale.linear().domain([0,globe.v.width]).range([-10,10]),
             label  = d3.select(this);
 
+            // label location
         var _x           = x+offset(x),
             _y           = y-3,
+            // labels fade as they approach the edge of the globe
             _fillopacity = globe.tools.fade_at_edge(d.geometry.coordinates),
             _display     = _fillopacity <= 0 ? 'none' : 'inline',
+            // change text anchor position as label moves from left to right 
             _textanchor  = x < globe.v.width/2-20 ? 'end' :
                            x < globe.v.width/2+20 ? 'middle' :
                                                     'start';
@@ -424,6 +490,7 @@ var globe = {
       });
     },
     toggle: function() {
+      // function to hide or show cities
       if (globe.v.labels_showing) { 
         globe.el.svg.select('.place_labels').style('display','none');
         globe.el.svg.select('.place_points').style('display','none');
@@ -439,20 +506,33 @@ var globe = {
   },
   tools: {
     new_gradient_stop: function(gradient, offset, color, opacity) {
+      // convenience function to add new stop to the supplied gradient def using the given parameters
       gradient.append('stop').attr('offset', offset).attr('stop-color', color).attr('stop-opacity',opacity);
     },
     fade_at_edge: function(d) {
+          // fade() translates a distance in radians into an opacity value from 0 to 1
       var fade = d3.scale.linear().domain([-.05,.15]).range([0,1]),
+          // points at the visible edge of the globe are 1.57 radians from the current globe center.
+          // so, 1.57 minus the distance of a given point from the globe's center provides the distance of 
+          // that point from the globe edge in radians.
           dist = 1.57 - globe.tools.distance_from_center(d);
+
       return fade(dist)
     },
     distance_from_center: function(d) {
+          // get position of globe's center in [lon,lat]
+          // could also use globe.params.proj.rotat() - but would have to invert signs...
       var centerPos = globe.params.proj.invert([globe.v.width/2,globe.v.height/2]),
+          // create a d3 great arc generator
           arc = d3.geo.greatArc();
+
+          // get the great arc distance (in radians) from a given location to the globe's focal point
       return arc.distance({source: d, target: centerPos})
     }
   },
   refresh: function() {
+    // updates svg paths
+    
     globe.el.svg.selectAll('.country').attr('d', globe.params.path);
     globe.el.svg.selectAll('.tile')   .attr('d', globe.params.path);
 
