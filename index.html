@@ -252,21 +252,24 @@ var globe = {
 
     var defs = globe.el.gradients.defs;
 
-    // gradient offsets
-    defs.ocean    .attr('cx', '75%').attr('cy', '25%');
-    defs.highlight.attr('cx', '75%').attr('cy', '25%');
-    defs.shading  .attr('cx', '50%').attr('cy', '40%');
+    // define gradient offsets
+    // and define colors and opacities of gradients with calls
+    // to globe.tools.new_gradient_stop 
 
-    // define colors and opacities of gradients
-    // using globe.tools.new_gradient_stop(gradient def, location, color, opacity)
-    globe.tools.new_gradient_stop( defs.ocean,     '5%',   '#ebebef', '0.5' );
-    globe.tools.new_gradient_stop( defs.ocean,     '100%', '#a2abb3', '0.5' );
+    defs.ocean
+      .attr('cx', '75%').attr('cy', '25%')
+      .call(globe.tools.new_gradient_stop, '5%',   '#ebebef', '0.5')
+      .call(globe.tools.new_gradient_stop, '100%', '#a2abb3', '0.5');
 
-    globe.tools.new_gradient_stop( defs.highlight, '5%',   '#ffffdd', '0.3' );
-    globe.tools.new_gradient_stop( defs.highlight, '100%', '#bbaa99', '0.1' );
+    defs.highlight
+      .attr('cx', '75%').attr('cy', '25%')
+      .call(globe.tools.new_gradient_stop, '5%',   '#ffffdd', '0.3' )
+      .call(globe.tools.new_gradient_stop, '100%', '#bbaa99', '0.1' );
 
-    globe.tools.new_gradient_stop( defs.shading,   '50%',  '#a2abb3', '0.0' );
-    globe.tools.new_gradient_stop( defs.shading,   '100%', '#57616b', '0.3' );
+    defs.shading
+      .attr('cx', '50%').attr('cy', '40%')
+      .call(globe.tools.new_gradient_stop, '50%',  '#a2abb3', '0.0' )
+      .call(globe.tools.new_gradient_stop, '100%', '#57616b', '0.3' );
 
     // apply gradient parameters to svg elements
     globe.el.gradients.ocean
